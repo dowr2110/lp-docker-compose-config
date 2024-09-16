@@ -1,0 +1,62 @@
+version: '3'
+services:
+  main_app:
+    build: ../lesson-planer
+    container_name: main_app_container
+    command: bash -c "rm -f /app/tmp/pids/server.pid && bundle exec rails s -b '0.0.0.0' -p 3000"
+    volumes:
+      - ../lesson-planer:/app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - elasticsearch
+      - rabbitmq
+      - analytics_service
+    environment:
+      DATABASE_URL: postgres://postgres:password@db:5432/main_app_db
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      RABBITMQ_URL: http://rabbitmq:5672
+      ANALYTICS_SERVICE_URL: http://analytics_service:3001
+
+  analytics_service:
+    build: ../lp-analytics-service
+    container_name: analytics_service_container
+    command: bash -c "rm -f /app/tmp/pids/server.pid && bundle exec rails s -b '0.0.0.0' -p 3001"
+    volumes:
+      - ../lp-analytics-service:/app
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongo
+      - rabbitmq
+    environment:
+      RABBITMQ_URL: http://rabbitmq:5672
+      MONGO_URL: mongo:27017
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: main_app_db
+    ports:
+      - "5433:5432"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    environment:
+      discovery.type: single-node
+    ports:
+      - "9200:9200"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
